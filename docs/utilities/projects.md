@@ -1,112 +1,399 @@
-# Projects
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ระบบเช็คชื่อและให้คะแนน</title>
+  <style>
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+    body {
+      margin: 0;
+      background: #f5f7fb;
+      color: #1f2937;
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 12px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.06);
+    }
+    h1, h2, h3 { margin: 0 0 8px 0; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .col { flex: 1; min-width: 0; }
+    input, textarea, button, select {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 16px;
+    }
+    textarea { min-height: 100px; resize: vertical; }
+    button {
+      background: #111827;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button.outline {
+      background: white;
+      color: #111827;
+      border: 1px solid #cbd5e1;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      font-size: 14px;
+      margin-right: 6px;
+      margin-top: 6px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 760px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .list {
+      max-height: 60vh;
+      overflow: auto;
+      display: grid;
+      gap: 8px;
+    }
+    .item {
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid #e5e7eb;
+      background: white;
+      cursor: pointer;
+    }
+    .item.active {
+      background: #111827;
+      color: white;
+    }
+    .small { font-size: 12px; opacity: .75; }
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(5,1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .score-btn {
+      padding: 12px 0;
+      border-radius: 14px;
+      border: 1px solid #cbd5e1;
+      background: white;
+      color: #111827;
+      font-weight: bold;
+    }
+    .score-btn.active {
+      background: #111827;
+      color: white;
+    }
+    .section {
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 12px;
+      background: #fff;
+      margin-bottom: 10px;
+    }
+    .muted { color: #6b7280; }
+    .top-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+    @media (max-width: 760px) {
+      .top-actions { grid-template-columns: 1fr; }
+    }
+    .checkline {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>ระบบเช็คชื่อและให้คะแนนรายบุคคล</h1>
+      <div>
+        <span class="badge" id="countAll">ผู้เข้าร่วม 0 คน</span>
+        <span class="badge" id="countCheckin">เช็คชื่อแล้ว 0 คน</span>
+      </div>
 
-This provide methods to manipulate project templates. This includes listing available projects, retrieving specific project details, and setting new project templates. This is particularly useful for creating and managing templates for different types of projects(frameworks), such as HTML templates, react, etc.
+      <div class="top-actions" style="margin-top:10px;">
+        <input id="evaluator" placeholder="ชื่อผู้ประเมิน" />
+        <button class="outline" onclick="toggleSetup()">จัดการรายชื่อ</button>
+      </div>
 
-## Importing Projects
+      <div id="setupBox" class="card" style="display:none; margin-top:12px; border:1px dashed #cbd5e1; box-shadow:none;">
+        <h3>วางรายชื่อใหม่ คนละ 1 บรรทัด</h3>
+        <textarea id="bulkNames" placeholder="เช่น
+สมชาย ใจดี
+สมหญิง ใจงาม"></textarea>
+        <div style="margin-top:10px;">
+          <button onclick="loadNames()">โหลดรายชื่อเข้าระบบ</button>
+        </div>
+      </div>
+    </div>
 
-To use the Projects utilities, you need to import them using the `acode.require` method:
+    <div class="layout">
+      <div class="card">
+        <h2>ค้นหารายชื่อ</h2>
+        <input id="searchBox" placeholder="พิมพ์ชื่อหรือรหัส" oninput="renderList()" />
+        <div class="list" id="participantList" style="margin-top:10px;"></div>
+      </div>
 
-```javascript
-const projects = acode.require('projects');
-```
+      <div class="card" id="detailBox">
+        <div id="detailContent"></div>
+      </div>
+    </div>
+  </div>
 
-## Methods
+  <script>
+    let participants = [
+      "ญาดา ไชยพิมูล",
+      "วิลัยศิยา พันธุ์เงิน",
+      "พิมพ์ชนก พันธ์รุพงศ์",
+      "ศุภิสรา พรหมวิจิต",
+      "อิสรีย์ แสนคำภา"
+    ].map((name, i) => ({
+      id: String(i + 1).padStart(3, "0"),
+      name,
+      checkedIn: false,
+      scores: { creativity: 0, social: 0, team: 0 },
+      note: "",
+      saved: false,
+      evaluator: ""
+    }));
 
-### `list()`
+    let selectedId = participants[0]?.id || "";
 
-The `list` method returns an array of objects, each containing the name and icon of a project.
+    const dimensions = [
+      { key: "creativity", title: "Creativity & Thinking", subtitle: "ความคิด + AI + การคิดแบบผู้ประกอบการ" },
+      { key: "social", title: "Social Responsibility Mindset", subtitle: "ความเข้าใจสังคม + Impact" },
+      { key: "team", title: "Team Contribution", subtitle: "บทบาทในทีม + Leadership" }
+    ];
 
-#### Example
+    function toggleSetup() {
+      const box = document.getElementById("setupBox");
+      box.style.display = box.style.display === "none" ? "block" : "none";
+    }
 
-```javascript
-const projectList = projects.list();
-console.log(projectList);
-// Output: [{ name: 'html', icon: 'html-project-icon' }]
-```
+    function loadNames() {
+      const bulk = document.getElementById("bulkNames").value.trim();
+      if (!bulk) return;
 
-### `get(name: string)`
+      const rows = bulk.split("\n").map(x => x.trim()).filter(Boolean);
+      participants = rows.map((name, i) => ({
+        id: String(i + 1).padStart(3, "0"),
+        name,
+        checkedIn: false,
+        scores: { creativity: 0, social: 0, team: 0 },
+        note: "",
+        saved: false,
+        evaluator: ""
+      }));
+      selectedId = participants[0]?.id || "";
+      document.getElementById("setupBox").style.display = "none";
+      renderAll();
+    }
 
-The `get` method takes a project name as an argument and returns an object containing the files and icon of that project.
+    function getSelected() {
+      return participants.find(p => p.id === selectedId) || participants[0] || null;
+    }
 
-#### Example
+    function totalScore(p) {
+      return p.scores.creativity + p.scores.social + p.scores.team;
+    }
 
-```javascript
-const projectDetails = projects.get('html');
-console.log(projectDetails);
-// Output: 
-// {
-//   files: {
-//     'index.html': '...',
-//     'css/index.css': '',
-//     'js/index.js': '',
-//   },
-//   icon: 'html-project-icon',
-// }
-```
+    function updateCounts() {
+      document.getElementById("countAll").textContent = `ผู้เข้าร่วม ${participants.length} คน`;
+      document.getElementById("countCheckin").textContent = `เช็คชื่อแล้ว ${participants.filter(p => p.checkedIn).length} คน`;
+    }
 
-### `set(project: string, files: () => Promise<Map<string, string>>, iconSrc: string)`
+    function renderList() {
+      updateCounts();
+      const q = document.getElementById("searchBox").value.trim().toLowerCase();
+      const list = document.getElementById("participantList");
 
-The `set` method allows you to add a new project template. It takes the project name, a function that returns a map of files, and an icon source as arguments.
+      const filtered = !q
+        ? participants
+        : participants.filter(p =>
+            p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)
+          );
 
-#### Example
+      list.innerHTML = filtered.map(p => `
+        <div class="item ${p.id === selectedId ? "active" : ""}" onclick="selectParticipant('${p.id}')">
+          <div style="display:flex;justify-content:space-between;gap:10px;">
+            <div>
+              <div class="small">ID ${p.id}</div>
+              <div style="font-weight:bold;">${escapeHtml(p.name)}</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="small">รวม</div>
+              <div style="font-weight:bold;">${totalScore(p)}</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;">
+            ${p.checkedIn ? '<span class="badge">มาแล้ว</span>' : ''}
+            ${p.saved ? '<span class="badge">บันทึกแล้ว</span>' : ''}
+          </div>
+        </div>
+      `).join("");
+    }
 
-```javascript
-const projectFiles = {
-  'index.html': '<!DOCTYPE html>...',
-  'css/index.css': '/* CSS file */',
-  'js/index.js': '// JavaScript file',
-};
+    function selectParticipant(id) {
+      selectedId = id;
+      renderAll();
+    }
 
-const iconSrc = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAABIUExURUdwTORPJuRPJuNOJeRPJuNQJ+RPJuNOJuNPJuROJeRPJuNOJuRPJuRQJONPJuNPJeVQI+NPJeROJuNPJuZPJ+NOJuRPJuNPJkmKsooAAAAXdFJOUwA6h5uxKGh/60/VE8BBll8izqXdDHT3jnqTYwAAAQRJREFUGBl9wY22azAURtGFhMS/Vvu9/5veHeGMMrhzAvoPkqBHgWTRo4XE6ZEjqfSoImn0qCGpZQYuBpmaJMpMXESZSFLIfLioZQoSLzMCzYmMJ+lkXsBbVx0bmR546YosSGqBUheBbJEUuFgkLWROpuMsSHJklYznTKYiK2WaHwWsMiXZRxceZpkP2SQzGO1mKGQmsigTwWvXQZSJZIVMDZ12K9QyBdks0wBDuUjvVw00MjNZJ1OxmWc2o0zHLkhynl9OUuDQyoS+jGx8PfZfSS2HXrvg6unVatdzcLrlOIy6NXIog26Ekj9+qlqdtNXkOSua/qvNt28Kbq1xfL/HuPLjH4f8MW+juHZUAAAAAElFTkSuQmCC';
+    function setCheckedIn(val) {
+      const p = getSelected();
+      if (!p) return;
+      p.checkedIn = val;
+      renderAll();
+    }
 
-projects.set('newProject', async () => projectFiles, iconSrc);
-```
+    function setScore(key, value) {
+      const p = getSelected();
+      if (!p) return;
+      p.scores[key] = value;
+      p.saved = false;
+      renderAll();
+    }
 
-:::warning
-- Ensure that the function provided for the `files` parameter returns a Promise that resolves to a map of filenames and their contents.
-:::
+    function setNote(val) {
+      const p = getSelected();
+      if (!p) return;
+      p.note = val;
+      p.saved = false;
+    }
 
-## Important Note on Using the `projects` Utility
+    function saveCurrent() {
+      const p = getSelected();
+      if (!p) return;
+      const evaluator = document.getElementById("evaluator").value.trim() || "ผู้ประเมิน";
+      p.saved = true;
+      p.checkedIn = true;
+      p.evaluator = evaluator;
+      renderAll();
+    }
 
-The `projects` utility does not persist added project templates. To avoid losing your templates when restarting the app, you must save them manually. Here's what you need to do:
+    function resetCurrent() {
+      const p = getSelected();
+      if (!p) return;
+      p.scores = { creativity: 0, social: 0, team: 0 };
+      p.note = "";
+      p.saved = false;
+      renderAll();
+    }
 
-1. **Save the Template:** Store the project template data in a persistent storage solution of your choice.
-2. **Re-add on Initialization:** When your plugin initializes, use the `projects` utility to re-add the template.
+    function exportText() {
+      return participants
+        .filter(p =>
+          p.saved ||
+          p.checkedIn ||
+          totalScore(p) > 0 ||
+          (p.note && p.note.trim() !== "")
+        )
+        .map(p =>
+          `${p.id} | ${p.name} | เช็คชื่อ:${p.checkedIn ? "มา" : "ยังไม่มา"} | Creativity:${p.scores.creativity} | Social:${p.scores.social} | Team:${p.scores.team} | Total:${totalScore(p)} | หมายเหตุ:${p.note || "-"}`
+        )
+        .join("\n");
+    }
 
-Failure to save and re-add your templates will result in their loss after the app restarts. Ensure you implement this to maintain your project templates effectively.
+    function copyExport() {
+      const txt = exportText();
+      navigator.clipboard.writeText(txt).then(() => {
+        alert("คัดลอกข้อมูลแล้ว");
+      }).catch(() => {
+        alert("คัดลอกไม่สำเร็จ ลองกดค้างแล้วคัดลอกเอง");
+      });
+    }
 
-:::tip
-Implement a function within your plugin to handle the saving and re-adding process automatically. 
-:::
+    function renderDetail() {
+      const box = document.getElementById("detailContent");
+      const p = getSelected();
 
-## Example
+      if (!p) {
+        box.innerHTML = "<div>ยังไม่มีข้อมูล</div>";
+        return;
+      }
 
-### Adding a New Project Template
+      box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+          <div>
+            <div class="muted">รหัส ${p.id}</div>
+            <h2 style="margin-top:4px;">${escapeHtml(p.name)}</h2>
+          </div>
+          <div class="badge" style="font-size:16px;">รวม ${totalScore(p)}/15</div>
+        </div>
 
-Here is a complete example of how to add a new project template, list all projects, and retrieve details of a specific project.
+        <div class="checkline" style="margin:12px 0;">
+          <input type="checkbox" id="checkin" ${p.checkedIn ? "checked" : ""} onchange="setCheckedIn(this.checked)" style="width:20px;height:20px;" />
+          <label for="checkin" style="font-weight:bold;">เช็คชื่อแล้ว</label>
+        </div>
 
-```javascript
-const projects = acode.require('projects');
+        ${dimensions.map(d => `
+          <div class="section">
+            <div style="font-weight:bold;">${d.title}</div>
+            <div class="muted" style="font-size:14px;">${d.subtitle}</div>
+            <div class="score-grid">
+              ${[1,2,3,4,5].map(n => `
+                <button type="button" class="score-btn ${p.scores[d.key] === n ? "active" : ""}" onclick="setScore('${d.key}', ${n})">${n}</button>
+              `).join("")}
+            </div>
+          </div>
+        `).join("")}
 
-async function addNewProject() {
-  const projectFiles = {
-    'index.html': '<!DOCTYPE html>...',
-    'css/index.css': '/* CSS file */',
-    'js/index.js': '// JavaScript file',
-  };
+        <div class="section">
+          <div style="font-weight:bold; margin-bottom:8px;">หมายเหตุ</div>
+          <textarea oninput="setNote(this.value)">${escapeHtml(p.note)}</textarea>
+        </div>
 
-  const iconSrc = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAABIUExURUdwTORPJuRPJuNOJeRPJuNQJ+RPJuNOJuNPJuROJeRPJuNOJuRPJuRQJONPJuNPJeVQI+NPJeROJuNPJuZPJ+NOJuRPJuNPJkmKsooAAAAXdFJOUwA6h5uxKGh/60/VE8BBll8izqXdDHT3jnqTYwAAAQRJREFUGBl9wY22azAURtGFhMS/Vvu9/5veHeGMMrhzAvoPkqBHgWTRo4XE6ZEjqfSoImn0qCGpZQYuBpmaJMpMXESZSFLIfLioZQoSLzMCzYmMJ+lkXsBbVx0bmR546YosSGqBUheBbJEUuFgkLWROpuMsSHJklYznTKYiK2WaHwWsMiXZRxceZpkP2SQzGO1mKGQmsigTwWvXQZSJZIVMDZ12K9QyBdks0wBDuUjvVw00MjNZJ1OxmWc2o0zHLkhynl9OUuDQyoS+jGx8PfZfSS2HXrvg6unVatdzcLrlOIy6NXIog26Ekj9+qlqdtNXkOSua/qvNt28Kbq1xfL/HuPLjH4f8MW+juHZUAAAAAElFTkSuQmCC';
+        <div class="row">
+          <div class="col"><button onclick="saveCurrent()">บันทึก</button></div>
+          <div class="col"><button class="outline" onclick="resetCurrent()">ล้างคะแนน</button></div>
+        </div>
 
-  projects.set('newProject', async () => projectFiles, iconSrc);
+        <div class="section" style="margin-top:12px;">
+          <div style="font-weight:bold; margin-bottom:8px;">สรุปที่คัดลอกออกไปใช้ได้ทันที</div>
+          <textarea readonly>${escapeHtml(exportText())}</textarea>
+          <div style="margin-top:10px;">
+            <button class="outline" onclick="copyExport()">คัดลอกข้อมูล</button>
+          </div>
+        </div>
+      `;
+    }
 
-  // List all projects
-  const projectList = projects.list();
-  console.log('Project List:', projectList);
+    function escapeHtml(str) {
+      return String(str || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
 
-  // Get details of the newly added project
-  const newProjectDetails = projects.get('newProject');
-  console.log('New Project Details:', newProjectDetails);
-}
+    function renderAll() {
+      renderList();
+      renderDetail();
+    }
 
-addNewProject();
-```
+    renderAll();
+  </script>
+</body>
+</html>
